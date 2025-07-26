@@ -2,10 +2,10 @@
 import {UserRoundPlus, X} from "lucide-vue-next";
 import {useI18n} from "vue-i18n";
 import {ref} from "vue";
-import axios from "axios";
 import {usePage} from "@inertiajs/vue3";
 import Notification from "@/components/Notification.vue";
 import {useNotification} from "@/composables/useNotification";
+import {useUserApi} from "@/services/api/userApiService";
 
 const page = usePage()
 const {t} = useI18n();
@@ -24,14 +24,14 @@ async function handleSubmit(e: Event) {
     errors.value = {};
 
     try {
-        const response = await axios.get(`api/users/pseudo/${formData.value.pseudo}`, {
+        const data = await useUserApi().getUserIdByPseudo(formData.value.pseudo, {
             _token: page.props.csrf_token,
-        });
+        })
 
-        await axios.post('api/users/friends/send', {
+        await useUserApi().sendFriendRequest({
             _token: page.props.csrf_token,
-            user_id: response.data.user_id
-        });
+            user_id: data.user_id
+        })
 
         formData.value = {
             pseudo: '',

@@ -6,6 +6,8 @@ import axios from "axios";
 import {useUserStore} from "@/stores/userStore";
 import {useI18n} from "vue-i18n";
 import {storeToRefs} from "pinia";
+import {useUserApi} from "@/services/api/userApiService";
+import {useAuthApi} from "@/services/api/authApiService";
 
 const {t} = useI18n();
 const page = usePage();
@@ -18,7 +20,6 @@ const isMobileMenuOpen = ref(false);
 
 const userStore = useUserStore();
 const { user } = storeToRefs(userStore);
-
 const { locale } = useI18n();
 
 const locales = [
@@ -48,17 +49,18 @@ function toggleMobileMenu(): void {
 }
 
 async function logout(): void {
-    await axios.post('/auth/logout', {
+    await useAuthApi().logout({
         _token: page.props.csrf_token,
-    });
+    })
+
     window.location.href = '/';
 }
 
 onMounted(async () => {
     const userId = page.props.auth.user.id;
     if (!user.value || !user.value.pseudo) {
-        const response = await axios.get(`/api/users/${userId}`);
-        await userStore.setUser(response.data);
+        const user = await useUserApi().fetchUser(userId)
+        await userStore.setUser(user);
     }
 });
 

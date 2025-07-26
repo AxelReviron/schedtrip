@@ -3,12 +3,19 @@ import { ref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { Eye, EyeOff } from "lucide-vue-next";
 import {usePage} from "@inertiajs/vue3";
-import axios from "axios";
 import Notification from "@/components/Notification.vue";
 import {useNotification} from "@/composables/useNotification";
+import {useAuthApi} from "@/services/api/authApiService";
 
 const {t} = useI18n();
 const page = usePage()
+
+const {
+    login,
+    error: loginError,
+    validationErrors: loginValidationErrors
+} = useAuthApi()
+
 const emit = defineEmits(['toggle-visibility']);
 const showPassword = ref(false);
 
@@ -26,7 +33,7 @@ async function handleSubmit(e: Event) {
     errors.value = {};
 
     try {
-        await axios.post('auth/login', {
+        await login({
             _token: page.props.csrf_token,
             ...formData.value
         });
@@ -39,8 +46,8 @@ async function handleSubmit(e: Event) {
 
         window.location.href = '/discover';
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-            errors.value = error.response.data.errors;
+        if (loginValidationErrors.value) {
+            errors.value = loginValidationErrors.value;
             showNotification(t("form.auth.notification.error.form"), 'error');
         } else if (error.response && error.response.status === 401) {// Credentials errors
             showNotification(t("form.auth.notification.error.credentials"), 'error');

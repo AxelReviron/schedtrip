@@ -14,8 +14,8 @@ import {useNotification} from "@/composables/useNotification";
 import {useTripFormStore} from "@/stores/tripFormStore";
 import {usePage} from "@inertiajs/vue3";
 import Notification from "@/components/Notification.vue";
-import axios from "axios";
 import Footer from "@/components/Footer.vue";
+import {useTripApi} from "@/services/api/tripApiService";
 
 const page = usePage();
 const {t} = useI18n();
@@ -26,10 +26,20 @@ const { user } = storeToRefs(userStore);
 const tripFormStore = useTripFormStore();
 const { trip } = storeToRefs(tripFormStore);
 
+const {
+    createTrip,
+    createStop,
+    addParticipantsToTrip,
+    loading,
+    validationErrors: tripValidationErrors,
+    error
+} = useTripApi();
+
 const errors = ref({
     trip_details: null,
     trip_destinations: []
 });
+
 const { notification, showNotification } = useNotification();
 
 function isTripDetailsValid(): void {
@@ -62,7 +72,7 @@ function isTripDestinationsValid(): void {
     })
 }
 
-async function createTrip(e: Event) {
+async function handleTripCreation(e: Event) {
     e.preventDefault();
     errors.value = {
         trip_details: null,
@@ -74,8 +84,10 @@ async function createTrip(e: Event) {
 
     if (errors.value.trip_details !== null || errors.value.trip_destinations.length > 0) return
 
+    // TODO: Add front validation
+    // TODO: Update message if trip was created without stops
     try {
-        const tripResponse = await axios.post('/api/trips', {//TODO
+        const tripCreated = await createTrip({
             _token: page.props.csrf_token,
             label: trip.value.label,
             description: trip.value.description,
@@ -84,16 +96,12 @@ async function createTrip(e: Event) {
             duration: null,/*trip.value.duration TODO: Bug here*/
             geojson: JSON.stringify(trip.value.geojson),
             author: trip.value.author,
-        }, {
-            headers: {
-                'Content-Type': 'application/ld+json'
-            }
-        });
+        })
 
-        const tripId = tripResponse.data.id;
+        const tripId = tripCreated.id;
 
         for (const stop of trip.value.stops) {
-            await axios.post('/api/stops', {
+            await createStop({
                 _token: page.props.csrf_token,
                 label: stop.label,
                 description: stop.description,
@@ -103,25 +111,20 @@ async function createTrip(e: Event) {
                 departureDate: stop.departure_date,
                 orderIndex: stop.order_index,
                 trip: `/api/trips/${tripId}`
-            }, {
-                headers: {
-                    'Content-Type': 'application/ld+json'
-                }
             });
         }
 
         if (trip.value.participants && trip.value.participants.length > 0) {
-            await axios.post(`/api/trips/${tripId}/participants`, {
+            await addParticipantsToTrip(tripId, {
                 _token: page.props.csrf_token,
                 participants: trip.value.participants
-            });
+            })
         }
-
 
         showNotification(t("trip.form.create_trip.notification.success"), 'success');
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-           errors.value = error.response.data.errors;
+        if (tripValidationErrors.value) {
+           errors.value = tripValidationErrors;
            showNotification(t("trip.form.create_trip.notification.error.form"), 'error');
         } else {// Other errors
            showNotification(t("trip.form.create_trip.notification.error.server"), 'error');
@@ -152,7 +155,7 @@ watch(
                 :subtitle="t('trip.form.create_trip.subtitle')"
                 :button-text="t('trip.form.create_trip.save')"
                 :icon="Save"
-                @click="createTrip"
+                @click="handleTripCreation"
                 :is-btn-disabled="false"
             />
 

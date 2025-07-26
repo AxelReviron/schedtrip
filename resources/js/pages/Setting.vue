@@ -8,9 +8,10 @@ import {useI18n} from "vue-i18n";
 import Notification from "@/components/Notification.vue";
 import {Eye, EyeOff, CircleUserRound, KeyRound} from "lucide-vue-next";
 import {useNotification} from "@/composables/useNotification";
-import axios from "axios";
 import {useUserStore} from "@/stores/userStore";
 import {storeToRefs} from "pinia";
+import {useUserApi} from "@/services/api/userApiService";
+import {useAuthApi} from "@/services/api/authApiService";
 
 const {t} = useI18n();
 const page = usePage();
@@ -33,22 +34,37 @@ const orsApiKey = ref<string|null>(null);
 const errors = ref({});
 const {notification, showNotification} = useNotification();
 
+const {
+    updateUserInfos,
+    validationErrors: authValidationErrors,
+    loading: authLoading,
+    error: authError
+} = useAuthApi()
+
+const {
+    addOrsApiKey,
+    validationErrors: userValidationErrors,
+    loading: userLoading,
+    error: userError
+} = useUserApi()
+
+
 async function handleUserUpdateSubmit(e: Event) {
     e.preventDefault();
     errors.value = {};
 
     try {
-        await axios.patch('/auth/update', {
+        await updateUserInfos({
             _token: page.props.csrf_token,
             ...formDataUserInfo.value
-        });
+        })
 
         showNotification(t("setting.form.notification.user_infos_success"), 'success', 5000);
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-            errors.value = error.response.data.errors;
+        if (authValidationErrors.value) {
+            errors.value = authValidationErrors.value
             showNotification(t("setting.form.notification.errors.form"), 'error', 5000);
-        } else {// Other errors
+        } else {
             showNotification(t("setting.form.notification.errors.server"), 'error', 5000);
         }
     }
@@ -59,18 +75,16 @@ async function handleAPIKeySubmit(e: Event) {
     errors.value = {};
 
     try {
-        const response = await axios.post('/api/users/ors/add-api-key', {
+        await addOrsApiKey({
             _token: page.props.csrf_token,
             ors_api_key: orsApiKey.value
-        });
-
-        orsApiKey.value = response.data;
+        })
         showNotification(t("setting.form.notification.ors_api_key_success"), 'success', 5000);
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-            errors.value = error.response.data.errors;
+        if (userValidationErrors.value) {
+            errors.value = userValidationErrors.value;
             showNotification(t("setting.form.notification.errors.form"), 'error', 5000);
-        } else {// Other errors
+        } else {
             showNotification(t("setting.form.notification.errors.server"), 'error', 5000);
         }
     }

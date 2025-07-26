@@ -2,16 +2,23 @@
 import { ref } from 'vue';
 import { useI18n } from "vue-i18n";
 import { Eye, EyeOff } from "lucide-vue-next";
-import axios from "axios";
 import Notification from "@/components/Notification.vue";
 import {usePage} from "@inertiajs/vue3";
 import {useNotification} from "@/composables/useNotification";
+import {useAuthApi} from "@/services/api/authApiService";
 
 const {t} = useI18n();
 const page = usePage()
 const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
 const emit = defineEmits(['toggle-visibility']);
+
+const {
+    register,
+    error: registerError,
+    validationErrors: registerValidationErrors,
+    rateLimitError: registerRateLimitError
+} = useAuthApi()
 
 const formData = ref({
     pseudo: '',
@@ -30,7 +37,7 @@ async function handleSubmit(e: Event) {
     errors.value = {};
 
     try {
-        await axios.post('auth/register', {
+        await register({
             _token: page.props.csrf_token,
             ...formData.value
         });
@@ -48,9 +55,12 @@ async function handleSubmit(e: Event) {
             window.location.href = '/discover';
         }, 4000);
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-            errors.value = error.response.data.errors;
+        if (registerValidationErrors.value) {// Validation errors
+            console.log(registerValidationErrors.value)
+            errors.value = registerValidationErrors.value;
             showNotification(t("form.auth.notification.error.form"), 'error');
+        } else if (registerRateLimitError.value) {
+            errors.value = registerRateLimitError.value
         } else if (error.response && error.response.status === 401) {// Credentials errors
             showNotification(t("form.auth.notification.error.credentials"), 'error');
         } else {// Other errors

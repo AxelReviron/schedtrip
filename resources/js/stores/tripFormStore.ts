@@ -4,9 +4,11 @@ import {usePage} from "@inertiajs/vue3";
 import StopInterface from "@/interfaces/stopInterface";
 import TripInterface from "@/interfaces/tripInterface";
 import UserInterface from "@/interfaces/userInterface";
-import axios from "axios";
+import {useTripApi} from "@/services/api/tripApiService";
 
 export const useTripFormStore = defineStore('tripForm', () => {
+    const { getStop } = useTripApi();
+
     const trip = ref<TripInterface>({// TODO: Use TripFormInterface
         label: null,
         description: null,
@@ -161,8 +163,8 @@ export const useTripFormStore = defineStore('tripForm', () => {
         for (const stop of newTrip.stops) {
             stop.markers = [];
             stop.notes = [];
-            const response = await axios.get(`/api/stops/${stop.id}`);
-            stop.notes.push(response.data);
+            const stopData = await getStop(stop.id);
+            stop.notes.push(stopData);
         }
 
         const participants = [];

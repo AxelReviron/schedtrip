@@ -15,6 +15,8 @@ import TripInterface from "@/interfaces/tripInterface";
 import Footer from "@/components/Footer.vue";
 import TripCardSkeleton from "@/components/Trip/Cards/TripCardSkeleton.vue";
 import UserInterface from "@/interfaces/userInterface";
+import {useTripApi} from "@/services/api/tripApiService";
+import {useUserApi} from "@/services/api/userApiService";
 
 const page = usePage()
 const {t} = useI18n();
@@ -26,6 +28,20 @@ const { user } = storeToRefs(userStore);
 const { trips } = storeToRefs(tripStore);
 
 const isReady = ref<boolean>(false);
+
+const {
+    getTripsByParticipant,
+    loading: tripParticipantsLoading,
+    validationErrors: tripParticipantsValidationErrors,
+    error: tripParticipantsError
+} = useTripApi()
+
+const {
+    fetchUser,
+    loading: userLoading,
+    error: userError,
+    validationErrors: userValidationErrors
+} = useUserApi()
 
 async function getMissingTrips(missingTripUrls: string[]): Promise<TripInterface[]> {
     const newTripsData: TripInterface[] = [];
@@ -45,9 +61,9 @@ async function getMissingTrips(missingTripUrls: string[]): Promise<TripInterface
 }
 
 async function getMissingTripsWhereUserIsParticipant(): Promise<TripInterface[]> {
-    const response = await axios.get(`/api/trips/participant/${user.value?.id}`);
+    const trips = await getTripsByParticipant(user.value?.id)
 
-    for (const trip of response.data) {
+    for (const trip of trips) {
         const author = await getAuthorInfos(trip);
         trip.author = {
             id: author.id,
@@ -56,45 +72,34 @@ async function getMissingTripsWhereUserIsParticipant(): Promise<TripInterface[]>
         };
     }
 
-    return response.data;
+    return trips;
 }
 
 async function getAuthorInfos(trip: TripInterface): UserInterface {
     const authorId = trip.author ? trip.author.split('/').pop() : trip.author_id.split('/').pop();
 
     if (user.value && authorId !== user.value.id) {
-        const response = await axios.get(trip.author ? trip.author : `/api/users/${trip.author_id}`);
-        return response.data;
+        return await fetchUser(trip.author_id)
     } else {
         return user.value;
     }
 }
 
-watch(// TODO: Refactor this (State Provider ?)
+watch(
     () => user.value?.trips,
     async (newTrips) => {
         if (!newTrips) return;
         isReady.value = false;
 
         const tripsUserParticipant = await getMissingTripsWhereUserIsParticipant();
-        const newTripsData: TripInterface[] = tripsUserParticipant ? tripsUserParticipant : [];
+        const missingTrips = await getMissingTrips(newTrips);
 
-        const currentTripIds = trips.value.map(trip => trip.id);
-        const missingTripUrls = newTrips.filter((url: string) => {
-            const tripId = url.split('/').pop();
-            return !currentTripIds.includes(tripId);
-        });
+        const newTripsData: TripInterface[] = [
+            ...tripsUserParticipant,
+            ...missingTrips,
+        ];
 
-        if (missingTripUrls.length === 0) {
-            tripStore.addTrip(newTripsData);
-            isReady.value = true;
-            return;
-        }
-
-        const missingTrips = await getMissingTrips(missingTripUrls);
-        newTripsData.push(...missingTrips);
-
-        tripStore.addTrip(newTripsData);
+        tripStore.setTrips(newTripsData);
         isReady.value = true;
     },
     { immediate: true }

@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import {MapPinned, UsersRound, CalendarArrowDown, CalendarArrowUp, Eye} from "lucide-vue-next";
-import {onMounted, ref, watch} from "vue";
+import {onMounted, ref} from "vue";
 import TripInterface from "@/interfaces/tripInterface";
 import {useI18n} from "vue-i18n";
-import axios from "axios";
-import UserInterface from "@/interfaces/userInterface";
 import {useUserStore} from "@/stores/userStore";
 import {storeToRefs} from "pinia";
 
@@ -40,8 +38,8 @@ function getTripDates(): void {
 }
 
 function canEditTrip() {
-
     const authorId = trip.author.id;
+
     if (user.value && authorId === user.value.id) {
         return true;
     } else if (trip.participantsList && trip.participantsList.length > 0) {
@@ -133,7 +131,7 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div class="flex flex-row items-center gap-2 mt-4 md:mt-6" v-if="trip.author">
+                <div class="flex flex-row items-center gap-2 mt-4 md:mt-6" v-if="trip.author && trip.author.pseudo">
                     <div class="relative inline-flex items-center justify-center w-8 h-8 overflow-hidden bg-cream rounded-full">
                         <span class="font-medium text-dark text-lg">{{ trip.author.pseudo.charAt(0).toUpperCase() }}</span>
                     </div>

@@ -1,12 +1,11 @@
 import {defineStore} from "pinia";
 import {ref} from "vue";
-import {usePage} from "@inertiajs/vue3";
 import TripInterface from "@/interfaces/tripInterface";
 
 export const useTripStore = defineStore('trip', () => {
     const trips: TripInterface[] | [] = ref([]);
 
-    async function setTrips(tripData: TripInterface[]) {
+    function setTrips(tripData: TripInterface[]) {
         trips.value = tripData;
     }
 
@@ -21,10 +20,5 @@ export const useTripStore = defineStore('trip', () => {
         // Actions
         setTrips,
         addTrip,
-    }
-}, {
-    persist: {
-        storage: localStorage,
-        paths: ['trips'],
     }
 });

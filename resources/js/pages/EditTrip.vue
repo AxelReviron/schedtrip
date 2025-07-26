@@ -14,8 +14,8 @@ import {useNotification} from "@/composables/useNotification";
 import {useTripFormStore} from "@/stores/tripFormStore";
 import {usePage} from "@inertiajs/vue3";
 import Notification from "@/components/Notification.vue";
-import axios from "axios";
 import Footer from "@/components/Footer.vue";
+import {useTripApi} from "@/services/api/tripApiService";
 
 const page = usePage();
 const {t} = useI18n();
@@ -35,6 +35,15 @@ const { notification, showNotification } = useNotification();
 onMounted(async () => {
     await tripFormStore.setTrip(page.props.trip);
 })
+
+const {
+    updateTrip,
+    updateStop,
+    updateParticipantsToTrip,
+    loading,
+    validationErrors: tripValidationErrors,
+    error
+} = useTripApi();
 
 function isTripDetailsValid(): void {
     if (!trip.value.label) {
@@ -66,7 +75,7 @@ function isTripDestinationsValid(): void {
     })
 }// TODO: Composable
 
-async function updateTrip(e: Event) {
+async function handleTripUpdate(e: Event) {
     e.preventDefault();
     errors.value = {
         trip_details: null,
@@ -79,7 +88,7 @@ async function updateTrip(e: Event) {
     if (errors.value.trip_details !== null || errors.value.trip_destinations.length > 0) return
 
     try {
-        const tripResponse = await axios.patch(`/api/trips/${trip.value.id}`, {
+        const tripUpdated = await updateTrip(trip.value.id, {
             _token: page.props.csrf_token,
             label: trip.value.label,
             description: trip.value.description,
@@ -87,16 +96,12 @@ async function updateTrip(e: Event) {
             distance: null,/*trip.value.distance TODO: Bug here*/
             duration: null,/*trip.value.duration TODO: Bug here*/
             geojson: JSON.stringify(trip.value.geojson),
-        }, {
-            headers: {
-                'Content-Type': 'application/merge-patch+json'
-            }
         });
 
-        const tripId = tripResponse.data.id;
+        const tripId = tripUpdated.id;
 
         for (const stop of trip.value.stops) {
-            await axios.patch(`/api/stops/${stop.id}`, {
+            await updateStop(stop.id, {
                 _token: page.props.csrf_token,
                 label: stop.label,
                 description: stop.description,
@@ -106,25 +111,20 @@ async function updateTrip(e: Event) {
                 departureDate: stop.departure_date,
                 orderIndex: stop.order_index,
                 trip: `/api/trips/${tripId}`
-            }, {
-                headers: {
-                    'Content-Type': 'application/merge-patch+json'
-                }
             });
         }
 
         if (trip.value.participants && trip.value.participants.length > 0) {
-            await axios.patch(`/api/trips/${tripId}/participants`, {
+            await updateParticipantsToTrip(tripId, {
                 _token: page.props.csrf_token,
                 participants: trip.value.participants
             });
         }
 
-
         showNotification(t("trip.edit_trip.notification.success"), 'success');
     } catch (error: any) {
-        if (error.response && error.response.status === 422) {// Validation errors
-            errors.value = error.response.data.errors;
+        if (tripValidationErrors.value) {// Validation errors
+            errors.value = tripValidationErrors.value;
             showNotification(t("trip.form.create_trip.notification.error.form"), 'error');
         } else {// Other errors
             showNotification(t("trip.form.create_trip.notification.error.server"), 'error');
@@ -155,7 +155,7 @@ watch(
                 :subtitle="t('trip.edit_trip.subtitle')"
                 :button-text="t('trip.form.create_trip.save')"
                 :icon="Save"
-                @click="updateTrip"
+                @click="handleTripUpdate"
                 :is-btn-disabled="false"
             />
 
